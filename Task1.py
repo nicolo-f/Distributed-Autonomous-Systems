@@ -8,15 +8,14 @@ def metropolis_hastings_weights(A):
     N = A.shape[0]
     deg = np.sum(A, axis=1)
     A_mh = np.zeros((N, N))
+    # print("Degrees:", deg)
     
     for i in range(N):
         for j in range(N):
             if A[i, j] == 1 and i != j:
                 A_mh[i, j] = 1.0 / (1 + max(deg[i], deg[j]))
-            elif A[i, j] == 1 and i == j:
-                A_mh[i, j] = 1.0 - np.sum(A_mh[i, :])
-            else:
-                A_mh[i, j] = 0.0
+            
+        A_mh[i, i] = 1.0 - np.sum(A_mh[i, :])
     
     return A_mh
 
@@ -43,19 +42,19 @@ def create_graph(N, p_er, type='random'):
     A_unweighted = Adj + np.eye(N)
     A = metropolis_hastings_weights(A_unweighted)
 
-    return A
+    return A, G
 
 def cost_fcn(zz, QQ, rr): 
     val = 0.5 * zz.T @ QQ @ zz + rr.T @ zz
     grad = QQ @ zz + rr
-    print("gradient shape:", grad.shape)
+    # print("gradient shape:", grad.shape)
     return val, grad
 
-d = 2  # dimension of the decision variable z
-N = 5  # number of agents
+d = 3  # dimension of the decision variable z
+N = 10  # number of agents
 p_er = 0.5  # probability for Erdos-Renyi graph
 type = 'random'  # type of graph
-maxIters = 200
+maxIters = 500
 alpha = 1e-1
 z_init = np.random.normal(size=(N, d))
 
@@ -73,7 +72,8 @@ s = np.zeros((maxIters, N, d))
 for i in range(N):
     _, s[0, i] = cost_fcn(z[0, i], Q[i], r[i])
 
-A = create_graph(N, 0.5, type)
+A, G = create_graph(N, 0.5, type)
+print("Weight matrix A:\n", A)
 
 for k in range(maxIters - 1):
     for i in range(N):
@@ -94,13 +94,15 @@ for k in range(maxIters - 1):
 
 z_avg = np.mean(z, axis=1)
 
-fig, axes = plt.subplots(figsize=(8, 6), nrows=1, ncols=1)
-ax = axes[0]
+fig, axes = plt.subplots(figsize=(8, 6), nrows=2, ncols=2)
+ax = axes[0, 0]
 # ax.semilogy(np.arange(maxIters - 1), np.abs(cost[:-1] - cost_opt))
-# ax.plot(np.arange(maxIters - 1), cost[:-1])
+nx.draw_kamada_kawai(G, with_labels=True, ax=ax)
 # ax.plot(np.arange(maxIters - 1), cost_opt * np.ones((maxIters - 1)), "r--")
+ax = axes[1, 0]
+ax.plot(np.arange(maxIters - 1), cost[:-1])
 
-ax = axes[1]
+ax = axes[1, 1]
 for i in range(N):
     ax.semilogy(np.arange(maxIters), np.abs(z[:, i] - z_avg))
     # ax.plot(np.arange(maxIters), z[:, i] - z_avg)
