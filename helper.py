@@ -93,9 +93,9 @@ class CostFunction:
             grad[tau] = -4 * residual * diff
     
         return cost, grad.flatten()
-    
-    
-    def distributed_aggregative(z, bary, gamma, r0, r,N,d):
+
+
+    def distributed_aggregative(z, bary, gamma, r0, r, d, N):
         """ Compute cost and gradient for distributed aggregative formation control """
         cost = 0.0
         grad_1 = np.zeros((d))
@@ -106,9 +106,10 @@ class CostFunction:
         cost += gamma * (np.linalg.norm(target_dist))**2 + (np.linalg.norm(bary_dist))**2
 
         # Gradient computation
+        # # domanda professore riguardo al gradiente
         grad_1 = 2*gamma*target_dist + (2*bary_dist)/N
-        grad_2 = (2*bary_dist) #gradient of the cost function
-
+        
+        grad_2 = (2*bary_dist) 
         return cost, grad_1, grad_2
 
 
