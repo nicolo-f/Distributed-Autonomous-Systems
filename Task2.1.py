@@ -21,8 +21,9 @@ robot_positions = np.random.uniform(low=0, high=10, size=(N, d))
 target_positions = robot_positions + np.random.normal(0, target_std,size=(N, d))
 
 
-# Initialize random positions
+# Initializations
 z_init = robot_positions
+# barycenter initialization
 
 print(f"\nInitial robot positions:\n", robot_positions)
 print(f"\nTarget positions:\n", target_positions)
@@ -36,8 +37,8 @@ grad_norm_s = np.zeros((maxIters, N))
 grad_norm_v = np.zeros((maxIters, N)) 
 
 for i in range(N):
-    _, s[0, i] = CostFunction.target_localization(z[0, i], distances[i], robot_positions[i], d, N)
-    grad_norm[0, i] = np.linalg.norm(s[0, i])
+    s[0, i] = z[0, i]
+    _,_, v[0, i] = CostFunction.distributed_aggregative(z[0, i], s[0, i], robot_positions[i], d, N)
 
 graph = Digraph(N, p_er, type)
 A = graph.get_weight_matrix()

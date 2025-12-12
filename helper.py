@@ -37,7 +37,7 @@ class Digraph:
         
         A_unweighted = Adj + np.eye(self.N)
         self.A = self.metropolis_hastings_weights(A_unweighted)
-        self.G = nx.from_numpy_array(self.A)
+        self.G = nx.from_numpy_array(self.A)  #  G is updated to include self-loops for visualization purposes
     
     def metropolis_hastings_weights(self, A):
         """Compute Metropolis-Hastings weights"""
@@ -50,6 +50,7 @@ class Digraph:
                     A_mh[i, j] = 1.0 / (1 + max(deg[i], deg[j]))
             
             A_mh[i, i] = 1.0 - np.sum(A_mh[i, :])
+            # self-loops and non-neighbors are considered in the sum but do not change the results because equals to zero
         
         return A_mh
     
@@ -74,19 +75,41 @@ class CostFunction:
     def target_localization(z, distances, robot_pos, d, NT):
         """ Compute cost and gradient for target localization """
         z_reshaped = z.reshape((NT, d))
-        
         cost = 0.0
         grad = np.zeros((NT, d))
         
         for tau in range(NT):
+            # Compute ||z_τ - p_i||² (squared distance from estimated target to robot)
             diff = z_reshaped[tau] - robot_pos
             squared_dist = np.linalg.norm(diff)**2
+            # Residual: d²_iτ - ||z_τ - p_i||²
             residual = distances[tau]**2 - squared_dist
             cost += residual**2
             
+            # Gradient: ∂/∂z_τ [(d²_iτ - ||z_τ - p_i||²)²]
+            # = 2 * residual * ∂/∂z_τ [-(||z_τ - p_i||²)]
+            # = 2 * residual * (-2) * (z_τ - p_i)
+            # = -4 * residual * (z_τ - p_i)
             grad[tau] = -4 * residual * diff
-        
+    
         return cost, grad.flatten()
+    
+    
+    def distributed_aggregative(z, bary, gamma, r0, r,N,d):
+        """ Compute cost and gradient for distributed aggregative formation control """
+        cost = 0.0
+        grad_1 = np.zeros((d))
+        grad_2 = np.zeros((d))
+
+        target_dist = z - r
+        bary_dist = bary - r0
+        cost += gamma * (np.linalg.norm(target_dist))**2 + (np.linalg.norm(bary_dist))**2
+
+        # Gradient computation
+        grad_1 = 2*gamma*target_dist + (2*bary_dist)/N
+        grad_2 = (2*bary_dist) #gradient of the cost function
+
+        return cost, grad_1, grad_2
 
 
 class Plotter:
@@ -103,7 +126,7 @@ class Plotter:
         
         # Graph drawing
         ax = axes[0]
-        nx.draw_kamada_kawai(G, with_labels=True, ax=ax)
+        nx.draw_kamada_kawai(G, with_labels=True, ax=ax)   # spring layout for better visualization
         ax.set_title('Network Graph')
         
         # Weight matrix A as annotated heatmap
@@ -122,7 +145,6 @@ class Plotter:
                 ax.text(j, i, f'{A[i, j]:.2f}',
                        ha="center", va="center", color="black", fontsize=8)
         
-        plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
         plt.tight_layout()
         return fig
     
@@ -130,7 +152,7 @@ class Plotter:
         """Plot cost evolution and consensus error"""
         fig, axes = plt.subplots(figsize=(10, 5), nrows=1, ncols=2)
         
-        z_avg = np.mean(z, axis=1)
+        z_avg = np.mean(z, axis=1)   # average estimate across agents at each iteration
         
         # Cost evolution
         ax = axes[0]
