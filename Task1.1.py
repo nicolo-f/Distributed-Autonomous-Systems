@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
-np.random.seed(1)
+np.random.seed(0)
 
 def metropolis_hastings_weights(A, N):
     deg = np.sum(A, axis=1)
