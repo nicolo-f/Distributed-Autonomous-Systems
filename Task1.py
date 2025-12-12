@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from helper import Digraph, CostFunction, Plotter
+from Mirco.helper_old import Digraph, CostFunction, Plotter
 
 np.random.seed(0)
 
