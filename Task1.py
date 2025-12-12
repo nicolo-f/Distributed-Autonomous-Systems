@@ -71,6 +71,7 @@ final_estimates = z[-1, 0, :].reshape((NT, d))  # Take agent 0's estimate (all s
 print(f"\nFinal estimated target positions:\n", final_estimates)
 print(f"\nTrue target positions:\n", true_targets)
 print(f"\nEstimation errors:\n", final_estimates - true_targets)
+print("\n\n")
 
 # Create plotter and generate all plots
 plotter = Plotter(N, d, NT)
