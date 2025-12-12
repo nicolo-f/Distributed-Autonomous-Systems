@@ -2,111 +2,103 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
+from helper import Digraph, CostFunction, Plotter
+
 np.random.seed(0)
 
-def metropolis_hastings_weights(A):
-    N = A.shape[0]
-    deg = np.sum(A, axis=1)
-    A_mh = np.zeros((N, N))
-    # print("Degrees:", deg)
-    
-    for i in range(N):
-        for j in range(N):
-            if A[i, j] == 1 and i != j:
-                A_mh[i, j] = 1.0 / (1 + max(deg[i], deg[j]))
-            
-        A_mh[i, i] = 1.0 - np.sum(A_mh[i, :])
-    
-    return A_mh
-
-def create_graph(N, p_er, type='random'):
-    if type == 'cycle':
-        G = nx.cycle_graph(N)
-        Adj = nx.adjacency_matrix(G).toarray()
-    elif type == 'path':
-        G = nx.path_graph(N)
-        Adj = nx.adjacency_matrix(G).toarray()
-    elif type == 'star':
-        G = nx.star_graph(N - 1) # star_graph(n) has n+1 nodes
-        Adj = nx.adjacency_matrix(G).toarray()
-    elif type == 'random':
-        while 1:
-            G = nx.erdos_renyi_graph(N, p_er)
-            Adj = nx.adjacency_matrix(G).toarray()
-            test = np.linalg.matrix_power(Adj + np.eye(N), N)
-            if np.all(test > 0):  # check strong coNectivity
-                break
-    else:
-        raise ValueError("Unknown topology")
-
-    A_unweighted = Adj + np.eye(N)
-    A = metropolis_hastings_weights(A_unweighted)
-
-    return A, G
-
-def cost_fcn(zz, QQ, rr): 
-    val = 0.5 * zz.T @ QQ @ zz + rr.T @ zz
-    grad = QQ @ zz + rr
-    # print("gradient shape:", grad.shape)
-    return val, grad
-
-d = 3  # dimension of the decision variable z
-N = 10  # number of agents
+# Parameters
+d = 2  # dimension of the decision variable z
+N = 8  # number of robots
+NT = 2  # number of targets
 p_er = 0.5  # probability for Erdos-Renyi graph
 type = 'random'  # type of graph
-maxIters = 500
-alpha = 1e-1
-z_init = np.random.normal(size=(N, d))
+maxIters = 1000
+alpha = 1e-3
+noise_std = 0.1  # standard deviation of measurement noise
 
-Q = []
-r = []
+# Initialize random positions
+z_init = np.random.uniform(low=0, high=10, size=(N, NT*d))
+robot_positions = np.random.uniform(low=0, high=10, size=(N, d))
+true_targets = np.random.uniform(low=0, high=10, size=(NT, d))
+
+print(f"\nRobot positions (N={N}, d={d}):\n", robot_positions)
+print(f"\nTrue target positions (NT={NT}, d={d}):\n", true_targets)
+
+# Generate noisy distance measurements
+distances = np.zeros((N, NT))
 for i in range(N):
-    Q.append(np.diag(np.random.uniform(size=(d))))
-    r.append(np.random.normal(size=(d)))
+    for tau in range(NT):
+        true_dist = np.linalg.norm(true_targets[tau] - robot_positions[i])
+        distances[i, tau] = true_dist + np.random.normal(0, noise_std)
+
+print(f"\nDistance measurements (N={N}, NT={NT}):\n", distances)
 
 cost = np.zeros((maxIters))
-z = np.zeros((maxIters, N, d))
+z = np.zeros((maxIters, N, NT*d))
 z[0, :, :] = z_init
-s = np.zeros((maxIters, N, d))
+s = np.zeros((maxIters, N, NT*d))
+grad_norm = np.zeros((maxIters, N)) 
 
+# Initialize gradients and their norms
 for i in range(N):
-    _, s[0, i] = cost_fcn(z[0, i], Q[i], r[i])
+    _, s[0, i] = CostFunction.target_localization(z[0, i], distances[i], robot_positions[i], d, NT)
+    grad_norm[0, i] = np.linalg.norm(s[0, i])
 
-A, G = create_graph(N, 0.5, type)
-print("Weight matrix A:\n", A)
+graph = Digraph(N, p_er, type)
+A = graph.get_weight_matrix()
+G = graph.get_graph()
 
+# Early stopping thresholds
+gradient_threshold = 1e-3  # Stop if all gradient norms are smaller than this
+patience = 10  # Number of consecutive iterations below threshold before stopping
+
+# Track convergence
+converged_count = 0
+
+# Gradient tracking algorithm for target localization
 for k in range(maxIters - 1):
+    max_gradient_norm = 0.0    # Track maximum gradient norm across all agents
     for i in range(N):
         N_i = np.nonzero(A[i])[0]  
         for j in N_i:
             z[k + 1, i] += A[i, j] * z[k, j]
 
-        z[k + 1, i] -= alpha * s[k, i]
+        z[k + 1, i] -= alpha * s[k, i]   # position update
 
         for j in N_i:
             s[k + 1, i] += A[i, j] * s[k, j]
 
-        _, grad_ell_i_new = cost_fcn(z[k + 1, i], Q[i], r[i])
-        ell_i, grad_ell_i_old = cost_fcn(z[k, i], Q[i], r[i])
-        s[k + 1, i] += grad_ell_i_new - grad_ell_i_old
+        _, grad_ell_i_new = CostFunction.target_localization(z[k+1, i], distances[i], robot_positions[i], d, NT)
+        ell_i, grad_ell_i_old = CostFunction.target_localization(z[k, i], distances[i], robot_positions[i], d, NT)
+        s[k + 1, i] += grad_ell_i_new - grad_ell_i_old    # gradient update with innovation term
 
+        grad_norm[k + 1, i] = np.linalg.norm(grad_ell_i_new)  # Store gradient norm
+        max_gradient_norm = max(max_gradient_norm, grad_norm[k + 1, i])
         cost[k] += ell_i  # accumulate global cost
 
-z_avg = np.mean(z, axis=1)
+    # Early stopping check
+    # if max_gradient_norm < gradient_threshold:
+    #     converged_count += 1
+    #     if converged_count >= patience:
+    #         actual_iters = k + 1
+    #         print(f"\nEarly stopping at iteration {actual_iters}")
+    #         break
+    # else:
+    #     converged_count = 0  # Reset counter if conditions not met
 
-fig, axes = plt.subplots(figsize=(8, 6), nrows=2, ncols=2)
-ax = axes[0, 0]
-# ax.semilogy(np.arange(maxIters - 1), np.abs(cost[:-1] - cost_opt))
-nx.draw_kamada_kawai(G, with_labels=True, ax=ax)
-# ax.plot(np.arange(maxIters - 1), cost_opt * np.ones((maxIters - 1)), "r--")
-ax = axes[1, 0]
-ax.plot(np.arange(maxIters - 1), cost[:-1])
+# Extract final estimated target positions
+final_estimates = z[-1, 0, :].reshape((NT, d))  # Take agent 0's estimate (all should agree)
+print(f"\nFinal estimated target positions:\n", final_estimates)
+print(f"\nTrue target positions:\n", true_targets)
+print(f"\nEstimation errors:\n", final_estimates - true_targets)
+print("\n\n")
 
-ax = axes[1, 1]
-for i in range(N):
-    ax.semilogy(np.arange(maxIters), np.abs(z[:, i] - z_avg))
-    # ax.plot(np.arange(maxIters), z[:, i] - z_avg)
+# Create plotter and generate all plots
+plotter = Plotter(N, d, NT)
 
+fig1 = plotter.plot_graph_and_weights(G, A)
+fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
+fig3 = plotter.plot_gradient_norms(grad_norm, maxIters)
+fig4 = plotter.plot_target_estimation(z, true_targets, maxIters)
 
 plt.show()
-
