@@ -4,8 +4,7 @@ import matplotlib.pyplot as plt
 
 np.random.seed(0)
 
-def metropolis_hastings_weights(A):
-    N = A.shape[0]
+def metropolis_hastings_weights(A, N):
     deg = np.sum(A, axis=1)
     A_mh = np.zeros((N, N))
     
@@ -39,14 +38,14 @@ def create_graph(N, p_er, type='random'):
         raise ValueError("Unknown topology")
 
     A_unweighted = Adj + np.eye(N)
-    A = metropolis_hastings_weights(A_unweighted)
+    A = metropolis_hastings_weights(A_unweighted, N)
     
     G = nx.from_numpy_array(A)
     return A, G
 
-def cost_fcn(zz, QQ, rr): 
-    val = 0.5 * zz.T @ QQ @ zz + rr.T @ zz
-    grad = QQ @ zz + rr
+def cost_fcn(z, Q, r): 
+    val = 0.5 * z.T @ Q @ z + r.T @ z
+    grad = Q @ z + r
     return val, grad
 
 d = 3  # dimension of the decision variable z
