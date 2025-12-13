@@ -91,8 +91,27 @@ class CostFunction:
             # = 2 * residual * (-2) * (z_τ - p_i)
             # = -4 * residual * (z_τ - p_i)
             grad[tau] = -4 * residual * diff
-        
+    
         return cost, grad.flatten()
+    
+    
+    def distributed_aggregative(z, bary, gamma, r0, r, d ,N):
+        """ Compute cost and gradient for distributed aggregative formation control """
+        cost = 0.0
+        grad_1 = np.zeros((d))
+        grad_2 = np.zeros((d))
+
+        target_dist = z - r
+        bary_dist = bary - r0
+        # cost += gamma * (np.linalg.norm(target_dist))**2 + (np.linalg.norm(bary_dist))**2
+        cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2
+        # cost += (np.linalg.norm(target_dist))**2 + gamma*(np.linalg.norm(bary_dist))**2
+
+        # Gradient computation
+        grad_1 = 2*gamma*target_dist + (2.0/N)*bary_dist
+        grad_2 = (2*bary_dist) #gradient of the cost function
+
+        return cost, grad_1, grad_2
 
 
 class Plotter:
@@ -249,7 +268,7 @@ class Plotter:
         ax.set_ylabel('Y position')
         ax.set_title('Target Position Estimates Evolution')
         ax.legend()
-        ax.grid(True)
+        ax.grid(True) 
         ax.axis('equal')
         
         plt.tight_layout()
