@@ -2,7 +2,7 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from helper import Digraph, CostFunction, Plotter
+from Mirco.helper_old import Digraph, CostFunction, Plotter
 
 np.random.seed(0)
 
@@ -39,7 +39,6 @@ z[0, :, :] = z_init
 s = np.zeros((maxIters, N, NT*d))
 grad_norm = np.zeros((maxIters, N)) 
 
-# Initialize gradients and their norms
 for i in range(N):
     _, s[0, i] = CostFunction.target_localization(z[0, i], distances[i], robot_positions[i], d, NT)
     grad_norm[0, i] = np.linalg.norm(s[0, i])
@@ -48,43 +47,24 @@ graph = Digraph(N, p_er, type)
 A = graph.get_weight_matrix()
 G = graph.get_graph()
 
-# Early stopping thresholds
-gradient_threshold = 1e-3  # Stop if all gradient norms are smaller than this
-patience = 10  # Number of consecutive iterations below threshold before stopping
-
-# Track convergence
-converged_count = 0
-
-# Gradient tracking algorithm for target localization
+# Gradient Tracking Algorithm
 for k in range(maxIters - 1):
-    max_gradient_norm = 0.0    # Track maximum gradient norm across all agents
     for i in range(N):
         N_i = np.nonzero(A[i])[0]  
         for j in N_i:
             z[k + 1, i] += A[i, j] * z[k, j]
 
-        z[k + 1, i] -= alpha * s[k, i]   # position update
+        z[k + 1, i] -= alpha * s[k, i]
 
         for j in N_i:
             s[k + 1, i] += A[i, j] * s[k, j]
 
         _, grad_ell_i_new = CostFunction.target_localization(z[k+1, i], distances[i], robot_positions[i], d, NT)
         ell_i, grad_ell_i_old = CostFunction.target_localization(z[k, i], distances[i], robot_positions[i], d, NT)
-        s[k + 1, i] += grad_ell_i_new - grad_ell_i_old    # gradient update with innovation term
+        s[k + 1, i] += grad_ell_i_new - grad_ell_i_old
 
         grad_norm[k + 1, i] = np.linalg.norm(grad_ell_i_new)  # Store gradient norm
-        max_gradient_norm = max(max_gradient_norm, grad_norm[k + 1, i])
         cost[k] += ell_i  # accumulate global cost
-
-    # Early stopping check
-    # if max_gradient_norm < gradient_threshold:
-    #     converged_count += 1
-    #     if converged_count >= patience:
-    #         actual_iters = k + 1
-    #         print(f"\nEarly stopping at iteration {actual_iters}")
-    #         break
-    # else:
-    #     converged_count = 0  # Reset counter if conditions not met
 
 # Extract final estimated target positions
 final_estimates = z[-1, 0, :].reshape((NT, d))  # Take agent 0's estimate (all should agree)
