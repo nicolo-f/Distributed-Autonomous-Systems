@@ -108,8 +108,10 @@ class CostFunction:
         # cost += (np.linalg.norm(target_dist))**2 + gamma*(np.linalg.norm(bary_dist))**2
 
         # Gradient computation
-        grad_1 = 2*gamma*target_dist + (2.0/N)*bary_dist
-        grad_2 = (2*bary_dist) #gradient of the cost function
+        # grad_1 = 2*gamma*target_dist + (2.0/N)*bary_dist
+        grad_1 = 2*gamma*target_dist + (1-gamma)*(2.0/N)*bary_dist
+        # grad_2 = (2*bary_dist) # gradient of the cost function
+        grad_2 = (1-gamma)*(2*bary_dist) # gradient of the cost function
 
         return cost, grad_1, grad_2
 
