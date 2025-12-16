@@ -110,11 +110,18 @@ class CostFunction:
         cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2
         # cost += (np.linalg.norm(target_dist))**2 + gamma*(np.linalg.norm(bary_dist))**2
 
-        # Gradient computation
-        # grad_1 = 2*gamma*target_dist + (2.0/N)*bary_dist
-        grad_1 = 2*gamma*target_dist + (1-gamma)*(2.0/N)*bary_dist
-        # grad_2 = (2*bary_dist) # gradient of the cost function
-        grad_2 = (1-gamma)*(2*bary_dist) # gradient of the cost function
+        # # Gradient computation
+        # # grad_1 = 2*gamma*target_dist + (2.0/N)*bary_dist
+        # grad_1 = 2*gamma*target_dist + (1-gamma)*(2.0/N)*bary_dist
+        # # grad_2 = (2*bary_dist) # gradient of the cost function
+        # grad_2 = (1-gamma)*(2*bary_dist) # gradient of the cost function
+
+        # Copilot solutions   
+        # grad_1: LOCAL gradient ∂φᵢ/∂zᵢ = 2γ(z - r)
+        grad_1 = 2 * gamma * target_dist
+        
+        # grad_2: AGGREGATIVE gradient ∂ψ/∂σᵢ = 2(1-γ)(1/N)(σᵢ - r0)
+        grad_2 = 2 * (1-gamma) * (1.0/N) * bary_dist
 
         return cost, grad_1, grad_2
 
