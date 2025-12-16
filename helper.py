@@ -1,6 +1,9 @@
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from PIL import Image, ImageEnhance
 
 class Digraph:
     """Class to manage graph creation and weight computation"""
@@ -275,3 +278,321 @@ class Plotter:
         
         plt.tight_layout()
         return fig
+    
+    def plot_robot_trajectories_and_barycenter(self, z, robot_positions, final_positions, target_positions, 
+                                               final_barycenter, s, maxIters):
+        # For aggregative problem, we can visualize robot trajectories
+        fig, axes = plt.subplots(figsize=(10, 5), nrows=1, ncols=2)
+
+        # Plot 1: Robot trajectories
+        ax = axes[0]
+        for i in range(self.N):
+            # Get color for this robot
+            color = f'C{i}'
+            
+            # Plot trajectory with same color
+            ax.plot(z[:, i, 0], z[:, i, 1], '-', color=color, alpha=0.5, label=f'Robot {i}')
+            
+            # Initial position (circle) - same color
+            ax.scatter(robot_positions[i, 0], robot_positions[i, 1], s=100, marker='o', 
+                    color=color, edgecolors='black', linewidths=1)
+            
+            # Final position (cross) - same color
+            ax.scatter(final_positions[i, 0], final_positions[i, 1], s=100, marker='x', 
+                    color=color, linewidths=2)
+            
+            # Target position (star) - same color
+            ax.scatter(target_positions[i, 0], target_positions[i, 1], s=150, marker='*', 
+                    color=color, edgecolors='black', linewidths=1)
+
+        # # Desired barycenter (red pentagon)
+        # ax.scatter(r0[0], r0[1], s=300, marker='P', color='red', 
+        #           edgecolors='black', linewidths=2, label='Desired barycenter', zorder=10)
+
+        # Final barycenter (green diamond)
+        ax.scatter(final_barycenter[0], final_barycenter[1], s=200, marker='D', 
+                color='green', edgecolors='black', linewidths=2, label='Final barycenter', zorder=10)
+
+        ax.set_xlabel('X position')
+        ax.set_ylabel('Y position')
+        ax.set_title('Robot Trajectories')
+        ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+        ax.grid(True)
+        ax.axis('equal')
+
+        # Plot 2: Barycenter estimate error
+        ax = axes[1]
+        bary_errors = np.zeros(maxIters)
+        for k in range(maxIters):
+            true_bary_k = np.mean(z[k, :, :], axis=0)
+            # Use one agent's estimate (they should all converge to same value)
+            bary_errors[k] = np.linalg.norm(s[k, 0, :] - true_bary_k)
+
+        ax.semilogy(np.arange(maxIters), bary_errors)
+        ax.set_xlabel('Iteration')
+        ax.set_ylabel('||s_i - true_barycenter||')
+        ax.set_title('Barycenter Estimate Error')
+        ax.grid(True)
+        
+        plt.tight_layout()
+        return fig
+    
+    def plot_robot_animation(self, z, robot_positions, target_positions, final_barycenter, maxIters, dt=0.01, 
+                             save=False, gif_name='robot_animation', use_images=False, robot_image_path=None, image_zoom=0.05):
+        """
+        Create an animated plot showing robot trajectories and moving robots
+        """
+
+        # Compute barycenter at each iteration
+        barycenter_trajectory = np.mean(z, axis=1)  # Shape: (maxIters, d)
+        target_barycenter = np.mean(target_positions, axis=0)  # Shape: (d,)
+
+        # Create figure with grid layout
+        fig = plt.figure(figsize=(17, 8))
+        gs = fig.add_gridspec(self.N, 2, width_ratios=[1, 1])
+        
+        time_pointers = []
+        time_vector = np.arange(maxIters) * dt
+        
+        # Left side: Individual robot trajectory plots
+        for i in range(self.N):
+            ax = fig.add_subplot(gs[i, 0])
+            time_pointer = ax.axvline(x=0, color='black', linestyle='--', label='_nolegend_')
+            time_pointers.append(time_pointer)
+            
+            # Plot x and y trajectories
+            ax.plot(time_vector, z[:, i, 0], 'b-', linewidth=1, alpha=0.7, label='x-pos' if i == 0 else "")
+            ax.plot(time_vector, z[:, i, 1], 'r-', linewidth=1, alpha=0.7, label='y-pos' if i == 0 else "")
+            
+            # Plot target positions as horizontal lines
+            ax.axhline(y=target_positions[i, 0], color='b', linestyle='--', alpha=0.5, linewidth=1)
+            ax.axhline(y=target_positions[i, 1], color='r', linestyle='--', alpha=0.5, linewidth=1)
+            
+            ax.grid(True, alpha=0.3)
+            if i == self.N - 1:
+                ax.set_xlabel('Time (s)')
+            ax.set_ylabel(f'Robot {i}')
+            if i == 0:
+                ax.set_title('Robot Position Evolution')
+                ax.legend(['', 'x-pos', 'y-pos'], loc='upper right', ncol=3, fontsize=8)
+        
+        # Right side: 2D animation of robots moving
+        ax2 = fig.add_subplot(gs[:, 1])
+        
+        # Set axis limits with some padding
+        all_positions = np.vstack([z.reshape(-1, self.d), robot_positions, target_positions, 
+                                   barycenter_trajectory, [target_barycenter]])
+        x_min, x_max = all_positions[:, 0].min(), all_positions[:, 0].max()
+        y_min, y_max = all_positions[:, 1].min(), all_positions[:, 1].max()
+        padding = 0.1 * max(x_max - x_min, y_max - y_min)
+        
+        ax2.set_xlim(x_min - padding, x_max + padding)
+        ax2.set_ylim(y_min - padding, y_max + padding)
+        ax2.set_xlabel('X Position')
+        ax2.set_ylabel('Y Position')
+        ax2.set_title('Robot Animation')
+        ax2.grid(True, alpha=0.3)
+        ax2.set_aspect('equal')
+        
+        # Plot static elements (trajectories and targets)
+        for i in range(self.N):
+            color = f'C{i}'
+            # Full trajectory (faded)
+            ax2.plot(z[:, i, 0], z[:, i, 1], '-', color=color, alpha=0.2, linewidth=1)
+            
+            # Target positions (stars)
+            ax2.scatter(target_positions[i, 0], target_positions[i, 1], 
+                       s=150, marker='*', color=color, edgecolors='black', 
+                       linewidths=1, zorder=5, alpha=0.7)
+        
+        # Plot barycenter trajectory (faded gray line)
+        ax2.plot(barycenter_trajectory[:, 0], barycenter_trajectory[:, 1], 
+                '--', color='gray', alpha=0.3, linewidth=2, label='Barycenter path')
+        
+        # Target barycenter (big black star)
+        ax2.scatter(target_barycenter[0], target_barycenter[1], 
+                   s=400, marker='*', color='black', edgecolors='gold', 
+                   linewidths=2, label='Target barycenter', zorder=15)
+        
+        # # Final barycenter (green diamond) - keep for reference
+        # ax2.scatter(final_barycenter[0], final_barycenter[1], 
+        #            s=200, marker='D', color='green', edgecolors='black', 
+        #            linewidths=2, label='Final barycenter', zorder=10)
+        
+        # Initialize animated elements
+        robot_artists = []  # Can be dots or images
+        trajectory_lines = []
+        
+        # Load robot image if using images
+        robot_img = []
+        if use_images and robot_image_path:
+            try:
+                base_image = Image.open(robot_image_path)
+                print(f"Loaded robot image from: {robot_image_path}")
+
+                                # Create colored version for each robot
+                for i in range(self.N):
+                    # Get RGB color from matplotlib color string
+                    color = f'C{i}'
+                    # Convert hex to RGB (0-1 range)
+                    from matplotlib.colors import to_rgb
+                    rgb_color = to_rgb(color)
+                    
+                    # Colorize the image
+                    colored_image = self.color_image(base_image, rgb_color)
+                    robot_img.append(colored_image)
+                    
+                print(f"Created {len(robot_img)} colored drone images")
+            except Exception as e:
+                print(f"Warning: Could not load image '{robot_image_path}': {e}")
+                print("Falling back to dot markers")
+                use_images = False
+                robot_img = [None] * self.N
+
+        for i in range(self.N):
+            color = f'C{i}'
+            
+            if use_images and robot_img and robot_img[i] is not None:
+                # Use the SPECIFIC colored image for this robot
+                imagebox = OffsetImage(robot_img[i], zoom=image_zoom)
+                ab = AnnotationBbox(imagebox, (robot_positions[i, 0], robot_positions[i, 1]), frameon=False, 
+                                   xycoords='data', box_alignment=(0.5, 0.5),
+                                   pad=0, zorder=6)
+                ax2.add_artist(ab)
+                robot_artists.append(ab)
+            else:
+                # Use dot marker
+                dot, = ax2.plot([], [], 'o', color=color, markersize=10, 
+                               markeredgecolor='black', markeredgewidth=1, zorder=6)
+                robot_artists.append(dot)
+            
+            # Trajectory line for each robot (regardless of using images or dots)
+            line, = ax2.plot([], [], '-', color=color, linewidth=2, alpha=0.8)
+            trajectory_lines.append(line)
+
+                # Add animated barycenter marker (black X)
+        barycenter_marker, = ax2.plot([], [], 'D', color='black', markersize=7, 
+                                      markeredgewidth=3, zorder=20, 
+                                      label='Current barycenter')
+        
+        # Add animated barycenter trajectory line
+        barycenter_line, = ax2.plot([], [], '-', color='black', 
+                                    linewidth=2, alpha=0.6, zorder=19)
+        
+        time_text = ax2.text(0.02, 0.98, '', transform=ax2.transAxes, 
+                           fontsize=12, verticalalignment='top',
+                           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+        
+        ax2.legend(loc='upper right', fontsize=8)
+        
+        def init():
+            """Initialize animation"""
+            for i, artist in enumerate(robot_artists):
+                if isinstance(artist, AnnotationBbox):
+                    artist.xy = (robot_positions[i, 0], robot_positions[i, 1])
+                else:
+                    artist.set_data([robot_positions[i, 0]], [robot_positions[i, 1]])
+            for i, line in enumerate(trajectory_lines):
+                line.set_data([robot_positions[i, 0]], [robot_positions[i, 1]])
+
+            # Initialize barycenter
+            barycenter_marker.set_data([barycenter_trajectory[0, 0]], [barycenter_trajectory[0, 1]])
+            barycenter_line.set_data([barycenter_trajectory[0, 0]], [barycenter_trajectory[0, 1]])
+
+            time_text.set_text('Time = 0.00 s\nIteration = 0')
+            for time_pointer in time_pointers:
+                time_pointer.set_xdata([0])
+
+            return (*robot_artists, *trajectory_lines, barycenter_marker, barycenter_line, 
+                    time_text, *time_pointers)
+        
+        def update(frame):
+            """Update animation frame"""
+            # Update robot positions and trajectories
+            for i in range(self.N):
+                # Current position
+                if isinstance(robot_artists[i], AnnotationBbox):
+                    # Update image position
+                    robot_artists[i].xy = (z[frame, i, 0], z[frame, i, 1])
+                    robot_artists[i].xybox = (z[frame, i, 0], z[frame, i, 1])
+                else:
+                    # Update dot position
+                    robot_artists[i].set_data([z[frame, i, 0]], [z[frame, i, 1]])
+                
+                # Trajectory up to current frame
+                trajectory_lines[i].set_data(z[:frame+1, i, 0], z[:frame+1, i, 1])
+            
+                        # Update barycenter position (current position)
+            barycenter_marker.set_data([barycenter_trajectory[frame, 0]], 
+                                      [barycenter_trajectory[frame, 1]])
+            
+            # Update barycenter trajectory (path up to current frame)
+            barycenter_line.set_data(barycenter_trajectory[:frame+1, 0], 
+                                    barycenter_trajectory[:frame+1, 1])
+            
+            # Update time text
+            time_text.set_text(f'Time = {frame * dt:.2f} s\nIteration = {frame}')
+            
+            # Update time pointers in left plots
+            for time_pointer in time_pointers:
+                time_pointer.set_xdata([frame * dt])
+            
+            return (*robot_artists, *trajectory_lines, barycenter_marker, barycenter_line, 
+                    time_text, *time_pointers)
+        
+        # Create animation
+        max_frames = 150
+        frames = range(0, maxIters, max(1, maxIters // max_frames))
+
+        ani = FuncAnimation(fig, update, frames=frames, init_func=init, 
+                          blit=True, interval=50)
+        
+        if save:
+            print(f'Saving animation as: {gif_name}.gif')
+            ani.save(f'{gif_name}.gif', writer='pillow', fps=20)
+            print('Animation saved')
+        
+        fig.suptitle('Robot Trajectory Animation', fontsize=22)
+        plt.tight_layout()
+        plt.show()
+        
+        return fig
+    
+    def color_image(self, image, color):
+        """
+        Colorize a grayscale/black image with a specific color using a better method
+        """
+        # Convert to RGBA if not already
+        if image.mode != 'RGBA':
+            image = image.convert('RGBA')
+        
+        # Convert to numpy array for easier manipulation
+        img_array = np.array(image).astype(float)
+        
+        # Extract RGB and alpha channels
+        rgb = img_array[:, :, :3]
+        alpha = img_array[:, :, 3]
+        
+        # Convert matplotlib color (0-1) to RGB (0-255)
+        target_color = np.array([color[0] * 255, color[1] * 255, color[2] * 255])
+        
+        # Calculate brightness (inverse for black drones)
+        # For a black drone on transparent background, we want dark areas to become colored
+        brightness = 1.0 - (np.mean(rgb, axis=2) / 255.0)  # Inverted
+        
+        # Create colored image by applying target color scaled by grayscale intensity
+        colored_rgb = np.zeros_like(rgb)
+        for i in range(3):
+            # Apply target color with brightness, keeping darker areas more saturated
+            colored_rgb[:, :, i] = target_color[i] * brightness
+        
+        # Ensure values are in valid range
+        colored_rgb = np.clip(colored_rgb, 0, 255)
+        
+        # Combine with alpha channel
+        colored_array = np.dstack([colored_rgb, alpha]).astype('uint8')
+        
+        # Convert back to PIL Image
+        colored_image = Image.fromarray(colored_array, 'RGBA')
+        
+        return colored_image
