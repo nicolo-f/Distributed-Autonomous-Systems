@@ -13,7 +13,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch_folder'), glob('launch_folder/*.py')),
-    ],
+        (os.path.join('share', package_name, 'resource'), glob('resource/*.rviz')),
+    ],  
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='mirco',
@@ -24,6 +25,8 @@ setup(
     entry_points={
         'console_scripts': [
             'aggregative_agent = task2.the_agent:main',
+            'task2_visualizer = task2.task2_visualizer:main',
+            'task2_plotter = task2.task2_plotter:main',
         ],
     },
 )
