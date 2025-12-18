@@ -13,8 +13,10 @@
 - Algorithm verification check
 - Clarify gradient definition (l 1/2 )
 - Define r0: barycenter, constant, or z?
+   -should we use an array for r0 or a single value?
 - Is using gamma and (1-gamma) in the cost function appropriate?
 - Should targets be initialized close to robots or placed randomly?
+
 
 **TODO:** Implement barrier function against other robots or against targets
 
