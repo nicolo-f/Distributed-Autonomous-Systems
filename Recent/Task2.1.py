@@ -112,14 +112,12 @@ plotter = Plotter(N, d, N)
 # fig1 = plotter.plot_graph_and_weights(G, A)
 # fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
 # fig3 = plotter.plot_gradient_norms(grad_norm_1, maxIters)
-# fig4 = plotter.plot_robot_trajectories_and_barycenter(z, robot_positions, final_positions, target_positions, final_barycenter, s, maxIters)
+# fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter)
 
 fig5 = plotter.plot_robot_animation(z, robot_positions, target_positions, 
-                                     final_barycenter, maxIters, 
-                                     dt=0.01, save=False, 
+                                     maxIters, dt=0.01, save=False, 
                                      gif_name='robot_formation_animation',
                                      use_images=True, robot_image_path=robot_image_path,
                                      image_zoom=0.05)
 
-plt.tight_layout()
 plt.show()

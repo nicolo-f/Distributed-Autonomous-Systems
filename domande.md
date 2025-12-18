@@ -5,7 +5,7 @@
 ## Task 1 Questions
 - Fixed or diminishing stepsize?
 - Early stopping criteria?
-- Noisy measurements?
+- is it ok to use white noise added to measurements?
 
 **To do:** Evaluate results across different orders of magnitude and assess performance in percentage terms.
 
@@ -17,7 +17,13 @@
 - Is using gamma and (1-gamma) in the cost function appropriate?
 - Should targets be initialized close to robots or placed randomly?
 
-
 **TODO:** Implement barrier function against other robots or against targets
+
+## Task 2.2 
+- Should we check that the data received at iteration x actually arrives at iteration x and not later?
+- Check if we actually need it on update_plot() iterazione 0
+
+**TODO:** Check visualizer file
+
 
 
