@@ -11,12 +11,12 @@ d = 2  # dimension of the decision variable z
 N = 8  # number of robots
 NT = 2  # number of targets
 p_er = 0.5  # probability for Erdos-Renyi graph
-type = 'random'  # type of graph
+type = 'random'  # Possible choices: 'cycle', 'random', 'star', 'path'
 maxIters = 1000
-alpha = 1e-3
+alpha = 1e-3 # step size
 noise_std = 0.1  # standard deviation of measurement noise
 
-# Initialize random positions
+# Robot and target initializations 
 z_init = np.random.uniform(low=0, high=10, size=(N, NT*d))
 robot_positions = np.random.uniform(low=0, high=10, size=(N, d))
 true_targets = np.random.uniform(low=0, high=10, size=(NT, d))
@@ -33,6 +33,7 @@ for i in range(N):
 
 print(f"\nDistance measurements (N={N}, NT={NT}):\n", distances)
 
+# Initialize variables for the algorithm 
 cost = np.zeros((maxIters))
 z = np.zeros((maxIters, N, NT*d))
 z[0, :, :] = z_init
@@ -44,16 +45,15 @@ for i in range(N):
     _, s[0, i] = CostFunction.target_localization(z[0, i], distances[i], robot_positions[i], d, NT)
     grad_norm[0, i] = np.linalg.norm(s[0, i])
 
+# Create strongly connected graph and the associated adjacency matrix
 graph = Digraph(N, p_er, type)
 A = graph.get_weight_matrix()
 G = graph.get_graph()
 
-# Early stopping thresholds
-gradient_threshold = 1e-3  # Stop if all gradient norms are smaller than this
-patience = 10  # Number of consecutive iterations below threshold before stopping
-
-# Track convergence
-converged_count = 0
+# # Early stopping thresholds
+# gradient_threshold = 1e-3  # Stop if all gradient norms are smaller than this
+# patience = 10  # Number of consecutive iterations below threshold before stopping
+# converged_count = 0 # Track convergence
 
 # Gradient tracking algorithm for target localization
 for k in range(maxIters - 1):
@@ -63,7 +63,7 @@ for k in range(maxIters - 1):
         for j in N_i:
             z[k + 1, i] += A[i, j] * z[k, j]
 
-        z[k + 1, i] -= alpha * s[k, i]   # position update
+        z[k + 1, i] -= alpha * s[k, i]   # update of target location estimate
 
         for j in N_i:
             s[k + 1, i] += A[i, j] * s[k, j]
@@ -88,6 +88,7 @@ for k in range(maxIters - 1):
 
 # Extract final estimated target positions
 final_estimates = z[-1, 0, :].reshape((NT, d))  # Take agent 0's estimate (all should agree)
+
 print(f"\nFinal estimated target positions:\n", final_estimates)
 print(f"\nTrue target positions:\n", true_targets)
 print(f"\nEstimation errors:\n", final_estimates - true_targets)
