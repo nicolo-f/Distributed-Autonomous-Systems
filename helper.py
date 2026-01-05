@@ -158,6 +158,7 @@ class CostFunction:
 
         cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
         # cost += gamma * (np.linalg.norm(target_dist))**2 + delta*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
+        print(f"Barrier cost: {mu * barrier_cost}")
         
         # Gradient computation (other solution)
         grad_1 = 2 * gamma * target_dist + mu * barrier_grad + 2 * (1-gamma) * bary_dist
@@ -333,7 +334,7 @@ class Plotter:
         return fig
     
     def plot_robot_trajectories(self, z, robot_positions, final_positions, target_positions, 
-                                               final_barycenter):
+                                               final_barycenter, z_optimal=None):
         """Plot robot trajectories and barycenter estimation error"""
 
         # For aggregative problem, we can visualize robot trajectories
@@ -357,6 +358,11 @@ class Plotter:
             # Target position (star)
             ax.scatter(target_positions[i, 0], target_positions[i, 1], s=150, marker='*', 
                     color=color, edgecolors='black', linewidths=1)
+            
+            # Optimal position (triangle) - NEW
+            if z_optimal is not None:
+                ax.scatter(z_optimal[i, 0], z_optimal[i, 1], s=100, marker='^', 
+                        color=color, edgecolors='gold', linewidths=2, zorder=0)
 
         # # Desired barycenter (red pentagon)
         # ax.scatter(r0[0], r0[1], s=300, marker='P', color='red', 
@@ -404,7 +410,7 @@ class Plotter:
             # Plot target positions as horizontal lines
             ax.axhline(y=target_positions[i, 0], color='b', linestyle='--', alpha=0.5, linewidth=1)
             ax.axhline(y=target_positions[i, 1], color='r', linestyle='--', alpha=0.5, linewidth=1)
-            
+
             ax.grid(True, alpha=0.3)
             if i == self.N - 1:
                 ax.set_xlabel('Time (s)')

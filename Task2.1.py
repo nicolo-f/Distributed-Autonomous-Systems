@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from helper import Digraph, CostFunction, Plotter
-np.random.seed(10) # For reproducibility
+np.random.seed(0) # For reproducibility
 
 # Path to robot image for animation
 robot_image_path = 'Nico/drone.png'
@@ -11,14 +11,14 @@ d = 2  # dimension of the decision variable z
 N = 8  # number of robots
 p_er = 0.5  # probability for Erdos-Renyi graph
 type = 'random'  # type of graph
-maxIters = 500
+maxIters = 500  # maximum number of iterations
 alpha = 1e-2 # step-size
 target_std = 2  # standard deviation to generate target positions
-gamma = 0.6  # trade-off parameter for target attainment vs formation keeping
+gamma = 0.0  # trade-off parameter for target attainment vs formation keeping
 
 # Barrier function parameters
-mu = 0.5  # barrier parameter
-threshold = 0.5  # threshold distance for barrier activation
+mu = 0.2  # barrier parameter
+threshold = 0.7  # threshold distance for barrier activation
 
 # Robot and target initializations 
 
@@ -75,6 +75,7 @@ G = graph.get_graph()
 
 # Aggregative Tracking Distributed Optimization Algorithm
 for k in range(maxIters - 1):
+    print('*******************************************')
     for i in range(N):
         ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative_barrier(z[k, i], s[k, i], gamma, r0[i], target_positions[i], d, 
                                                                            z[k, :, :], mu, threshold)
@@ -102,10 +103,15 @@ for k in range(maxIters - 1):
         grad_norm_2[k + 1, i] = np.linalg.norm(grad_2)  
         cost[k] += ell_i
 
+    print(f"Iteration {k}: Cost = {cost[k]}")
+
 # Compute final metrics
 final_positions = z[-1, :, :]
 final_barycenter = np.mean(final_positions, axis=0) # True final barycenter
 final_aggregate_estimates = s[-1, :, :]  # Each agent's estimate of barycenter at final iteration 
+z_optimal = np.zeros((N, d)) 
+for i in range(N):
+    z_optimal[i] = gamma * target_positions[i] + (1 - gamma) * np.mean(target_positions, axis=0)
 
 # Print some informations
 print(f"\nFinal robot positions:\n", final_positions)
@@ -121,9 +127,9 @@ print("\n\n")
 plotter = Plotter(N, d, N)
 
 # fig1 = plotter.plot_graph_and_weights(G, A)
-# fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
+fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
 # fig3 = plotter.plot_gradient_norms(grad_norm_1, maxIters)
-# fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter)
+# fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter, z_optimal)
 
 fig5 = plotter.plot_robot_animation(z, robot_positions, target_positions, 
                                      maxIters, dt=0.01, save=False, 
