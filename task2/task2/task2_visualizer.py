@@ -3,8 +3,10 @@ from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray as MsgFloat
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point
+from matplotlib.colors import to_rgb
 import numpy as np
-
+import os
+from ament_index_python.packages import get_package_share_directory
 
 class Task2Visualizer(Node):
     def __init__(self):
@@ -13,67 +15,63 @@ class Task2Visualizer(Node):
             allow_undeclared_parameters=True,
             automatically_declare_parameters_from_overrides=True,
         )
+        # Mesh related variables
+        self.use_mesh = False
+        self.mesh_path = "package://task2/resource/Quadcopter.stl"
 
         # Get parameters
-        self.N = self.get_parameter("N").value
-        self.d = self.get_parameter("d").value
+        self.N = self.get_parameter("N").value   # Total number of agents
+        self.d = self.get_parameter("d").value   # Dimension of decision variable
         
-        # Get target positions for visualization
+        # Get target positions
         self.targets = []
         for i in range(self.N):
             target = self.get_parameter(f"target_{i}").value
             self.targets.append(np.array(target))
         
-        # Get r0 (desired barycenter)
-        self.r0 = np.array(self.get_parameter("r0").value)
+        self.r0 = np.array(self.get_parameter("r0").value)  # Desired r0
 
-        # Storage for agent positions
+        # Storage variable for agent data visualization 
         self.agent_positions = {i: np.zeros(self.d) for i in range(self.N)}
         self.agent_trajectories = {i: [] for i in range(self.N)}
         
-        # Colors for each agent (RGB)
-        self.colors = [
-            (1.0, 0.0, 0.0),  # Red
-            (0.0, 1.0, 0.0),  # Green
-            (0.0, 0.0, 1.0),  # Blue
-            (1.0, 1.0, 0.0),  # Yellow
-            (1.0, 0.0, 1.0),  # Magenta
-            (0.0, 1.0, 1.0),  # Cyan
-            (1.0, 0.5, 0.0),  # Orange
-            (0.5, 0.0, 1.0),  # Purple
-        ]
+        # Define a color for each agents
+        self.colors = [to_rgb(f'C{i % 10}') for i in range(self.N)]
 
-        # Subscribe to all agents
+        # Check if mesh file exists
+        try:
+            pkg_share = get_package_share_directory('task2')
+            mesh_file = os.path.join(pkg_share, 'resource', 'Quadcopter.stl')
+            if os.path.exists(mesh_file):
+                self.use_mesh = True
+        except Exception as e:
+            self.get_logger().warn(f'Could not locate mesh file: {e}, using spheres instead')
+
+        # Define publishers and subscribers
+        # Create listeners to receive data from all agents
         for i in range(self.N):
             self.create_subscription(
                 MsgFloat,
-                f"/topic_{i}",
-                lambda msg, agent_id=i: self.agent_callback(msg, agent_id),
+                f"/data_{i}",
+                lambda msg, agent_id=i: self.data_callback(msg, agent_id),
                 10,
             )
 
-        # Publishers for visualization
+        # Create publisher for visualization markers
         self.marker_pub = self.create_publisher(MarkerArray, "/visualization_marker_array", 10)
         
-        # Timer for visualization updates
-        self.timer = self.create_timer(0.1, self.publish_markers)
+        self.timer = self.create_timer(0.1, self.publish_markers)   # Timer to publish markers
 
-        print("\n" + "="*60)
-        print("🎨 TASK2 VISUALIZER INITIALIZED")
-        print("="*60)
-        print(f"Number of agents: {self.N}")
-        print(f"Dimension: {self.d}")
-        print(f"Desired barycenter r0: {self.r0}")
-        print("="*60 + "\n")
-
-    def agent_callback(self, msg, agent_id):
-        """Receive agent position and store it"""
-        # Message format: [id, iter, z, s, v]
+    def data_callback(self, msg, agent_id):
+        """
+        Receive agent data and store it
+        Message format: [id, iter, z, s, v]
+        """
         z = np.array(msg.data[2:2+self.d])
         self.agent_positions[agent_id] = z
         
-        # Store trajectory (limit to last 500 points)
         self.agent_trajectories[agent_id].append(z.copy())
+        # Keep only last 500 positions for trajectory
         if len(self.agent_trajectories[agent_id]) > 500:
             self.agent_trajectories[agent_id].pop(0)
 
@@ -82,26 +80,48 @@ class Task2Visualizer(Node):
         marker_array = MarkerArray()
         marker_id = 0
 
-        # 1. Agent positions (spheres)
-        for i in range(self.N):
+        # Define AGENT POSITIONS (mesh or spheres)
+        for i, pos in self.agent_positions.items():
             marker = Marker()
             marker.header.frame_id = "world"
             marker.header.stamp = self.get_clock().now().to_msg()
             marker.ns = "agents"
             marker.id = marker_id
             marker_id += 1
-            marker.type = Marker.SPHERE
             marker.action = Marker.ADD
             
-            marker.pose.position.x = float(self.agent_positions[i][0])
-            marker.pose.position.y = float(self.agent_positions[i][1])
+            # Position
+            marker.pose.position.x = float(pos[0])
+            marker.pose.position.y = float(pos[1])
             marker.pose.position.z = 0.0
-            marker.pose.orientation.w = 1.0
             
-            marker.scale.x = 0.3
-            marker.scale.y = 0.3
-            marker.scale.z = 0.3
+            if self.use_mesh:
+                # Use MESH (quadcopter file)
+                marker.type = Marker.MESH_RESOURCE
+                marker.mesh_resource = self.mesh_path
+                
+                # Orientation (top view require 90deg rotation around x-axis)
+                angle = np.pi / 2  # 90 degrees in radians
+                marker.pose.orientation.x = np.sin(angle / 2)
+                marker.pose.orientation.y = 0.0
+                marker.pose.orientation.z = 0.0
+                marker.pose.orientation.w = np.cos(angle / 2)
+                
+                # Scale for mesh
+                marker.scale.x = 0.003
+                marker.scale.y = 0.003
+                marker.scale.z = 0.003
+            else:
+                # Use SPHERE as fallback
+                marker.type = Marker.SPHERE
+                marker.pose.orientation.w = 1.0
+                
+                # Scale for sphere
+                marker.scale.x = 0.3
+                marker.scale.y = 0.3
+                marker.scale.z = 0.3
             
+            # Color per agent
             color = self.colors[i % len(self.colors)]
             marker.color.r = color[0]
             marker.color.g = color[1]
@@ -109,32 +129,8 @@ class Task2Visualizer(Node):
             marker.color.a = 1.0
             
             marker_array.markers.append(marker)
-            
-            # Agent label
-            text_marker = Marker()
-            text_marker.header.frame_id = "world"
-            text_marker.header.stamp = self.get_clock().now().to_msg()
-            text_marker.ns = "agent_labels"
-            text_marker.id = marker_id
-            marker_id += 1
-            text_marker.type = Marker.TEXT_VIEW_FACING
-            text_marker.action = Marker.ADD
-            
-            text_marker.pose.position.x = float(self.agent_positions[i][0])
-            text_marker.pose.position.y = float(self.agent_positions[i][1])
-            text_marker.pose.position.z = 0.5
-            text_marker.pose.orientation.w = 1.0
-            
-            text_marker.scale.z = 0.3
-            text_marker.color.r = 1.0
-            text_marker.color.g = 1.0
-            text_marker.color.b = 1.0
-            text_marker.color.a = 1.0
-            
-            text_marker.text = f"Agent {i}"
-            marker_array.markers.append(text_marker)
 
-        # 2. Target positions (stars)
+        # Define TARGET POSITIONS (cyliniders)
         for i in range(self.N):
             marker = Marker()
             marker.header.frame_id = "world"
@@ -162,7 +158,7 @@ class Task2Visualizer(Node):
             
             marker_array.markers.append(marker)
 
-        # 3. Agent trajectories (line strips)
+        # Define AGENT TRAJECTORIES (line strips)
         for i in range(self.N):
             if len(self.agent_trajectories[i]) > 1:
                 marker = Marker()
@@ -191,61 +187,7 @@ class Task2Visualizer(Node):
                 
                 marker_array.markers.append(marker)
 
-        # 4. Current barycenter (computed from agent positions)
-        current_barycenter = np.mean(list(self.agent_positions.values()), axis=0)
-        marker = Marker()
-        marker.header.frame_id = "world"
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "barycenter"
-        marker.id = marker_id
-        marker_id += 1
-        marker.type = Marker.SPHERE
-        marker.action = Marker.ADD
-        
-        marker.pose.position.x = float(current_barycenter[0])
-        marker.pose.position.y = float(current_barycenter[1])
-        marker.pose.position.z = 0.3
-        marker.pose.orientation.w = 1.0
-        
-        marker.scale.x = 0.4
-        marker.scale.y = 0.4
-        marker.scale.z = 0.4
-        
-        marker.color.r = 0.0
-        marker.color.g = 1.0
-        marker.color.b = 0.0
-        marker.color.a = 0.8
-        
-        marker_array.markers.append(marker)
-
-        # 5. Desired barycenter r0 (fixed)
-        marker = Marker()
-        marker.header.frame_id = "world"
-        marker.header.stamp = self.get_clock().now().to_msg()
-        marker.ns = "desired_barycenter"
-        marker.id = marker_id
-        marker_id += 1
-        marker.type = Marker.CUBE
-        marker.action = Marker.ADD
-        
-        marker.pose.position.x = float(self.r0[0])
-        marker.pose.position.y = float(self.r0[1])
-        marker.pose.position.z = 0.0
-        marker.pose.orientation.w = 1.0
-        
-        marker.scale.x = 0.5
-        marker.scale.y = 0.5
-        marker.scale.z = 0.1
-        
-        marker.color.r = 1.0
-        marker.color.g = 0.0
-        marker.color.b = 0.0
-        marker.color.a = 0.5
-        
-        marker_array.markers.append(marker)
-
-        # Publish all markers
-        self.marker_pub.publish(marker_array)
+        self.marker_pub.publish(marker_array)   # Publish all markers
 
 
 def main(args=None):

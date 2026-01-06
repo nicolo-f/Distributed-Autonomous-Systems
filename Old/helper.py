@@ -97,7 +97,6 @@ class CostFunction:
     
         return cost, grad.flatten()
     
-    
     def distributed_aggregative(z, bary, gamma, r0, r, d ,N):
         """ Compute cost and gradient for distributed aggregative formation control """
         cost = 0.0
@@ -119,6 +118,51 @@ class CostFunction:
         # # Gradient computation (other solution)
         grad_1 = 2 * gamma * target_dist
         grad_2 = 2 * (1-gamma) * (1.0/N) * bary_dist
+
+        return cost, grad_1, grad_2
+    
+    def distributed_aggregative_barrier(z, bary, gamma, r0, r, d ,N, z_all, mu=1.0, threshold=1.0):
+        """ Compute cost and gradient for distributed aggregative formation control """
+        cost = 0.0
+        barrier_cost = 0.0
+
+        delta = 10.0 # formation keeping weight (used for testing)
+
+        grad_1 = np.zeros((d))
+        grad_2 = np.zeros((d))
+        barrier_grad = np.zeros((d))
+
+        target_dist = z - r
+        bary_dist = bary - r0
+
+        for j in range(len(z_all)):
+            z_j = z_all[j]
+            
+            # Skip self
+            if np.allclose(z, z_j):
+                continue
+            
+            # Compute squared distance
+            diff = z - z_j
+            dist_squared = np.linalg.norm(diff)**2
+            
+            # Barrier argument: ||z_i - z_j||^2 - threshold^2 
+            barrier_arg = dist_squared - threshold**2
+
+            barrier_cost += -np.log(barrier_arg)
+            barrier_grad += -2 * diff / barrier_arg
+
+        # cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
+        cost += gamma * (np.linalg.norm(target_dist))**2 + delta*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
+        
+        # Gradient computation (other solution)
+        grad_1 = 2 * gamma * target_dist + mu * barrier_grad
+        # grad_2 = 2 * (1-gamma) * (1.0/N) * bary_dist
+        grad_2 = 2 * delta * (1.0/N) * bary_dist
+
+        # Barrier function for collision avoidance
+        
+        
 
         return cost, grad_1, grad_2
 
@@ -291,10 +335,7 @@ class Plotter:
         """Plot robot trajectories and barycenter estimation error"""
 
         # For aggregative problem, we can visualize robot trajectories
-        fig, axes = plt.subplots(figsize=(10, 5), nrows=1, ncols=1)
-
-        # Plot robot trajectories
-        ax = axes
+        fig, ax = plt.subplots(figsize=(10, 5), nrows=1, ncols=1)
 
         for i in range(self.N):
             # Get color for this robot
@@ -333,8 +374,8 @@ class Plotter:
         plt.tight_layout()
         return fig
     
-    def plot_robot_animation(self, z, robot_positions, target_positions, maxIters, dt=0.01, 
-                             save=False, gif_name='robot_animation', use_images=False, robot_image_path=None, image_zoom=0.05):
+    def plot_robot_animation(self, z, robot_positions, target_positions, maxIters, dt=0.01, save=False, gif_name='robot_animation',
+                              threshold=1.0, use_images=False, robot_image_path=None, image_zoom=0.05):
         """Create an animated plot showing robot trajectories and moving robots"""
 
         # Compute barycenter at each iteration
@@ -411,6 +452,7 @@ class Plotter:
         # Initialize animated elements
         robot_artists = []  # List of robot markers (images or dots)
         trajectory_lines = [] 
+        collision_circles = []  # List of collision avoidance circles
         
         # Load robot image if using images
         robot_img = []
@@ -459,7 +501,14 @@ class Plotter:
             line, = ax2.plot([], [], '-', color=color, linewidth=2, alpha=0.8)
             trajectory_lines.append(line)
 
-                # Add animated barycenter marker (black X)
+            # Create collision avoidance circle for each robot
+            circle = plt.Circle((robot_positions[i, 0], robot_positions[i, 1]), 
+                            threshold, color=color, fill=False, 
+                            linestyle='--', linewidth=1.5, alpha=0.5, zorder=4)
+            ax2.add_patch(circle)
+            collision_circles.append(circle)
+
+        # Add animated barycenter marker (black X)
         barycenter_marker, = ax2.plot([], [], 'D', color='black', markersize=7, 
                                       markeredgewidth=3, zorder=20, 
                                       label='Current barycenter')
@@ -492,8 +541,8 @@ class Plotter:
             for time_pointer in time_pointers:
                 time_pointer.set_xdata([0])
 
-            return (*robot_artists, *trajectory_lines, barycenter_marker, barycenter_line, 
-                    time_text, *time_pointers)
+            return (*robot_artists, *trajectory_lines, *collision_circles, 
+                    barycenter_marker, barycenter_line, time_text, *time_pointers)
         
         def update(frame):
             """Update animation frame"""
@@ -510,8 +559,11 @@ class Plotter:
                 
                 # Trajectory up to current frame
                 trajectory_lines[i].set_data(z[:frame+1, i, 0], z[:frame+1, i, 1])
+
+                # Update collision circle position
+                collision_circles[i].center = (z[frame, i, 0], z[frame, i, 1])
             
-                        # Update barycenter position (current position)
+            # Update barycenter position (current position)
             barycenter_marker.set_data([barycenter_trajectory[frame, 0]], 
                                       [barycenter_trajectory[frame, 1]])
             
@@ -526,8 +578,8 @@ class Plotter:
             for time_pointer in time_pointers:
                 time_pointer.set_xdata([frame * dt])
             
-            return (*robot_artists, *trajectory_lines, barycenter_marker, barycenter_line, 
-                    time_text, *time_pointers)
+            return (*robot_artists, *trajectory_lines, *collision_circles, barycenter_marker, 
+                    barycenter_line, time_text, *time_pointers)
         
         # Create animation
         max_frames = 150

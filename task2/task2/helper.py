@@ -93,15 +93,15 @@ class CostFunction:
     
         return cost, grad.flatten()
     
-    
-    def distributed_aggregative(z, bary, gamma, r0, r, d ,N):
+    def distributed_aggregative(z, bary, gamma, r0, r, d):
         """ Compute cost and gradient for distributed aggregative formation control """
         cost = 0.0
         grad_1 = np.zeros((d))
         grad_2 = np.zeros((d))
 
         target_dist = z - r
-        bary_dist = bary - r0
+        # bary_dist = bary - r0
+        bary_dist = z - bary  # corrected direction for formation keeping
         # cost += gamma * (np.linalg.norm(target_dist))**2 + (np.linalg.norm(bary_dist))**2
         cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2
         
@@ -113,7 +113,53 @@ class CostFunction:
         # grad_2 = (1-gamma)*(2*bary_dist) 
 
         # # Gradient computation (other solution)
-        grad_1 = 2 * gamma * target_dist
-        grad_2 = 2 * (1-gamma) * (1.0/N) * bary_dist
+        grad_1 = 2 * gamma * target_dist + 2 * (1-gamma) * bary_dist
+        grad_2 = 2 * (1-gamma) * (-bary_dist)
+        # grad_2 = 2 * (1-gamma) * bary_dist
 
+        return cost, grad_1, grad_2
+    
+    def distributed_aggregative_barrier(z, bary, gamma, r0, r, d, z_all, mu=1.0, threshold=1.0):
+        """ Compute cost and gradient for distributed aggregative formation control """
+        cost = 0.0
+        barrier_cost = 0.0
+
+        # delta = 10.0 # formation keeping weight (used for testing)
+
+        grad_1 = np.zeros((d))
+        grad_2 = np.zeros((d))
+        barrier_grad = np.zeros((d))
+
+        target_dist = z - r
+        bary_dist = z - bary
+        # bary_dist = bary - r0
+
+        # Barrier function for collision avoidance: -log(||z_i - z_j||^2 - threshold^2)
+        for j in range(len(z_all)):
+            z_j = z_all[j]
+            
+            # Skip self
+            if np.allclose(z, z_j):
+                continue
+
+            # Compute squared distances
+            diff = z - z_j
+            dist = np.linalg.norm(diff)
+            # Barrier argument: ||z_i - z_j||^2 - threshold^2
+            barrier_arg = max(dist**2 - threshold**2, 1e-6)
+
+            barrier_cost += -np.log(barrier_arg)
+            barrier_grad += -2 * diff / barrier_arg
+
+        cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
+        # cost += gamma * (np.linalg.norm(target_dist))**2 + delta*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
+        print(f"Barrier cost: {mu * barrier_cost}")
+        
+        # Gradient computation (other solution)
+        grad_1 = 2 * gamma * target_dist + mu * barrier_grad + 2 * (1-gamma) * bary_dist
+        grad_2 = 2 * (1-gamma) * (-bary_dist)
+        # grad_2 = 2 * delta * bary_dist
+
+        
+        
         return cost, grad_1, grad_2

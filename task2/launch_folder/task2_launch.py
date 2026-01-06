@@ -10,33 +10,36 @@ np.random.seed(0)
 
 def generate_launch_description():
     """Launch file for aggregative tracking with RViz2 visualization"""
-
+    
     # Configuration parameters
-    MAXITERS = 500
+    MAXITERS = 500 
     COMM_TIME = 1e-2
 
     N = 6
     d = 2
 
     alpha = 1e-2
-    gamma = 1.0
+    gamma = 0.8
     target_std = 2.0
     p_er = 0.5
 
-    
-    # Initialize positions and targets
+    # Initialize robot and target positions
     robot_positions = np.random.uniform(low=0, high=10, size=(N, d))
     target_positions = robot_positions + np.random.normal(0, target_std, size=(N, d))
+    z_init = robot_positions.flatten() 
 
-    # Initialize r0 
-    # r0 = robot_positions.copy()  # r0[i] = z[0, i]    # agent-dependent (each has own desired position)
-    r0 = np.tile(np.mean(target_positions, axis=0), (N, 1))  # Shared barycenter (mean of targets)
-    # r0 = np.full((N, d), [5.0, 5.0])  # All want same constant barycenter
+    # Define desired r0
 
+    # All agents share the same desired barycenter (mean of targets)
+    # r0 = np.tile(np.mean(target_positions, axis=0), (N, 1))
 
-    z_init = robot_positions.flatten()
+    # All agents share a specific constant barycenter
+    # r0 = np.full((N, d), [5.0, 5.0]) 
 
-    # Create random directed graph
+    # r0 is agent-dependent (each agent has its own desired position)
+    r0 = robot_positions.copy()  # r0[i] = z[0, i]
+
+    # Create strongly connected graph and the associated adjacency matrix
     digraph = Digraph(N, p_er, 'random')
     A = digraph.get_weight_matrix()
     G = digraph.get_graph()
@@ -44,8 +47,9 @@ def generate_launch_description():
     Adj = (A > 0).astype(bool)
     np.fill_diagonal(Adj, 0)
 
-    # Create nodes
-    # RViz2 node 
+    # Configure nodes
+    
+    # RViz2 node
     rviz_config_file = "/home/mirco/das_ros2_ws/src/task2/resource/task2_config.rviz"
     
     rviz_node = Node(
@@ -56,7 +60,7 @@ def generate_launch_description():
         output='screen'
     )
 
-    # Visualizer node 
+    # Visualizer node
     vis_params = {
         "N": N,
         "d": d,
@@ -87,7 +91,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Agent nodes 
+    # Agent nodes
     agent_nodes = []
     
     for i in range(N):
@@ -119,22 +123,21 @@ def generate_launch_description():
         
         agent_nodes.append(agent_node)
 
-    # Launch sequence
+    # Define launch sequence 
 
-    # Nodes that will be launched immediately
+    # Nodes to be launched immediately
     launch_description = [
-        # rviz_node,
-        # visualizer_node,
+        rviz_node,
+        visualizer_node,
         plotter_node,
     ]
     
-    # Add agents with delay
-    delay = 3.0
+    # Delayed start for agent nodes
     for agent_node in agent_nodes:
-        delayed_agent = TimerAction( 
-            period=delay,  
+        delayed_agent = TimerAction(
+            period=5.0,  # Wait 5 seconds before starting agents
             actions=[agent_node]
         )
-        launch_description.append(delayed_agent) # Add delayed agent launch
+        launch_description.append(delayed_agent)
 
     return LaunchDescription(launch_description)

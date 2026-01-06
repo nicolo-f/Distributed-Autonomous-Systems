@@ -14,6 +14,7 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch_folder'), glob('launch_folder/*.py')),
         (os.path.join('share', package_name, 'resource'), glob('resource/*.rviz')),
+        (os.path.join('share', package_name, 'resource'), glob('resource/*.stl')),
     ],  
     install_requires=['setuptools'],
     zip_safe=True,

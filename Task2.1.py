@@ -4,21 +4,21 @@ from helper import Digraph, CostFunction, Plotter
 np.random.seed(0) # For reproducibility
 
 # Path to robot image for animation
-robot_image_path = 'Mirco/drone.png'
+robot_image_path = 'Nico/drone.png'
 
 # Parameters
 d = 2  # dimension of the decision variable z
 N = 8  # number of robots
 p_er = 0.5  # probability for Erdos-Renyi graph
 type = 'random'  # type of graph
-maxIters = 500
+maxIters = 500  # maximum number of iterations
 alpha = 1e-2 # step-size
 target_std = 2  # standard deviation to generate target positions
-gamma = 1.0  # trade-off parameter for target attainment vs formation keeping
+gamma = 0.0  # trade-off parameter for target attainment vs formation keeping
 
 # Barrier function parameters
-mu = 0.0  # barrier parameter
-threshold = 1.0  # threshold for barrier activation
+mu = 0.2  # barrier parameter
+threshold = 0.7  # threshold distance for barrier activation
 
 # Robot and target initializations 
 
@@ -49,41 +49,42 @@ grad_norm_1 = np.zeros((maxIters, N))
 # Define desired r0
 
 # All agents share the same desired barycenter (mean of targets)
-r0 = np.tile(np.mean(target_positions, axis=0), (N, 1))
+# r0 = np.tile(np.mean(target_positions, axis=0), (N, 1))
 
 # All agents share a specific constant barycenter
 # r0 = np.full((N, d), [2.0, 2.0]) 
 
 # r0 is agent-dependent (each agent has its own desired position)
-# for i in range(N):
-#     r0[i] = z[0, i]
+for i in range(N):
+    r0[i] = z[0, i]
 
 # Initialize s (local barycenter estimates) and v (local gradients_2 estimates)
 for i in range(N):
     s[0, i] = z[0, i]
-    _,_, v[0, i] = CostFunction.distributed_aggregative_barrier(z[0, i], s[0, i], gamma, r0[i], target_positions[i], d, N,
-                                                                           z[0, :, :], mu, threshold)
-    # _,_, v[0, i] = CostFunction.distributed_aggregative(z[0, i], s[0, i], gamma, r0[i], target_positions[i], d, N)
-    # _,_, v[0, i] = CostFunction.distributed_aggregative(z[0, i], s[0, i], gamma, r0, target_positions[i], d, N)
+    _,_, v[0, i] = CostFunction.distributed_aggregative_barrier(z[0, i], s[0, i], gamma, r0[i], target_positions[i], d,
+                                                                          z[0, :, :], mu, threshold)
+    # _,_, v[0, i] = CostFunction.distributed_aggregative(z[0, i], s[0, i], gamma, r0[i], target_positions[i], d)
+    # _,_, v[0, i] = CostFunction.distributed_aggregative(z[0, i], s[0, i], gamma, r0, target_positions[i], d)
 
     grad_norm_1[0, i] = np.linalg.norm(v[0, i])  # norm of gradient_2
 
 # Create strongly connected graph and the associated adjacency matrix
-graph = Digraph(N, p_er, type)
+graph = Digraph(N, p_er, type) 
 A = graph.get_weight_matrix()
 G = graph.get_graph()
 
 # Aggregative Tracking Distributed Optimization Algorithm
 for k in range(maxIters - 1):
+    print('*******************************************')
     for i in range(N):
-        ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative_barrier(z[k, i], s[k, i], gamma, r0[i], target_positions[i], d, N,
+        ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative_barrier(z[k, i], s[k, i], gamma, r0[i], target_positions[i], d, 
                                                                            z[k, :, :], mu, threshold)
-        # ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative(z[k, i], s[k, i], gamma, r0[i], target_positions[i], d, N)
-        # ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative(z[k, i], s[k, i], gamma, r0, target_positions[i], d, N)
+        # ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative(z[k, i], s[k, i], gamma, r0[i], target_positions[i], d)
+        # ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative(z[k, i], s[k, i], gamma, r0, target_positions[i], d)
         # notice: grad_phi always equal to 1 so we dont add it in the code
  
         z[k + 1, i] = z[k, i] - alpha * (grad_1 + v[k, i])  # Update robot position
-        # r0[i] = z[k+1, i]
+        r0[i] = z[k+1, i]
 
         N_i = np.nonzero(A[i])[0]   # Neighbors of robot i
 
@@ -92,20 +93,25 @@ for k in range(maxIters - 1):
             v[k + 1, i] += A[i, j] * v[k, j]
  
         s[k + 1, i] +=  z[k + 1, i] - z[k, i]   # Update local barycenter estimate
-        _,_,grad_2_next = CostFunction.distributed_aggregative_barrier(z[k + 1, i], s[k + 1, i], gamma, r0[i], target_positions[i], d, N,
+        _,_,grad_2_next = CostFunction.distributed_aggregative_barrier(z[k + 1, i], s[k + 1, i], gamma, r0[i], target_positions[i], d,
                                                                            z[k + 1, :, :], mu, threshold)
-        # _,_, grad_2_next = CostFunction.distributed_aggregative(z[k + 1, i], s[k + 1, i], gamma, r0[i], target_positions[i], d, N)
-        # _,_, grad_2_next = CostFunction.distributed_aggregative(z[k + 1, i], s[k + 1, i], gamma, r0, target_positions[i], d, N)
+        # _,_, grad_2_next = CostFunction.distributed_aggregative(z[k + 1, i], s[k + 1, i], gamma, r0[i], target_positions[i], d)
+        # _,_, grad_2_next = CostFunction.distributed_aggregative(z[k + 1, i], s[k + 1, i], gamma, r0, target_positions[i], d)
         v[k + 1, i] += grad_2_next - grad_2   # Update local gradient_2 estimate with innovation term
  
         grad_norm_1[k + 1, i] = np.linalg.norm(grad_1)  
         grad_norm_2[k + 1, i] = np.linalg.norm(grad_2)  
         cost[k] += ell_i
 
+    print(f"Iteration {k}: Cost = {cost[k]}")
+
 # Compute final metrics
 final_positions = z[-1, :, :]
 final_barycenter = np.mean(final_positions, axis=0) # True final barycenter
 final_aggregate_estimates = s[-1, :, :]  # Each agent's estimate of barycenter at final iteration 
+z_optimal = np.zeros((N, d)) 
+for i in range(N):
+    z_optimal[i] = gamma * target_positions[i] + (1 - gamma) * np.mean(target_positions, axis=0)
 
 # Print some informations
 print(f"\nFinal robot positions:\n", final_positions)
@@ -121,9 +127,9 @@ print("\n\n")
 plotter = Plotter(N, d, N)
 
 # fig1 = plotter.plot_graph_and_weights(G, A)
-# fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
+fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
 # fig3 = plotter.plot_gradient_norms(grad_norm_1, maxIters)
-# fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter)
+# fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter, z_optimal)
 
 fig5 = plotter.plot_robot_animation(z, robot_positions, target_positions, 
                                      maxIters, dt=0.01, save=False, 
