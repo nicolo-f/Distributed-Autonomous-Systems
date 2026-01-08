@@ -1,15 +1,18 @@
 import numpy as np
-import networkx as nx
 import matplotlib.pyplot as plt
 
 from helper import Digraph, CostFunction, Plotter
 
 np.random.seed(0)
 
+# Variables for saving figures
+save_fig = True
+fig_save_path = "./figures/Task1_2/random_graph2/"
+
 # Parameters
 d = 2  # dimension of the decision variable z
 N = 8  # number of robots
-NT = 2  # number of targets
+NT = 6  # number of targets
 p_er = 0.5  # probability for Erdos-Renyi graph
 type = 'random'  # Possible choices: 'cycle', 'random', 'star', 'path'
 maxIters = 1000
@@ -50,11 +53,6 @@ graph = Digraph(N, p_er, type)
 A = graph.get_weight_matrix()
 G = graph.get_graph()
 
-# # Early stopping thresholds
-# gradient_threshold = 1e-3  # Stop if all gradient norms are smaller than this
-# patience = 10  # Number of consecutive iterations below threshold before stopping
-# converged_count = 0 # Track convergence
-
 # Gradient tracking algorithm for target localization
 for k in range(maxIters - 1):
     max_gradient_norm = 0.0    # Track maximum gradient norm across all agents
@@ -76,16 +74,6 @@ for k in range(maxIters - 1):
         max_gradient_norm = max(max_gradient_norm, grad_norm[k + 1, i])
         cost[k] += ell_i  # accumulate global cost
 
-    # Early stopping check
-    # if max_gradient_norm < gradient_threshold:
-    #     converged_count += 1
-    #     if converged_count >= patience:
-    #         actual_iters = k + 1
-    #         print(f"\nEarly stopping at iteration {actual_iters}")
-    #         break
-    # else:
-    #     converged_count = 0  # Reset counter if conditions not met
-
 # Extract final estimated target positions
 final_estimates = z[-1, 0, :].reshape((NT, d))  # Take agent 0's estimate (all should agree)
 
@@ -97,9 +85,9 @@ print("\n\n")
 # Create plotter and generate all plots
 plotter = Plotter(N, d, NT)
 
-fig1 = plotter.plot_graph_and_weights(G, A)
-fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
-fig3 = plotter.plot_gradient_norms(grad_norm, maxIters)
-fig4 = plotter.plot_target_estimation(z, true_targets, maxIters)
+fig1 = plotter.plot_graph_and_weights(G, A, save=save_fig, save_path=fig_save_path+"graph.png")
+fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters, save=save_fig, save_path=fig_save_path+"cost_consensus.png")
+fig3 = plotter.plot_gradient_norms(grad_norm, maxIters, save=save_fig, save_path=fig_save_path+"gradient_norms.png")
+fig4 = plotter.plot_target_estimation(z, true_targets, maxIters, save=save_fig, save_path=fig_save_path+"target_estimation.png")
 
 plt.show()

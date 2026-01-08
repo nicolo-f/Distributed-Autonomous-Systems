@@ -3,8 +3,12 @@ import matplotlib.pyplot as plt
 from helper import Digraph, CostFunction, Plotter
 np.random.seed(0) # For reproducibility
 
+# Variables for saving figures
+save_fig = True
+fig_save_path = "./figures/Task2_1/gamma1.0_mu0.0/"
+
 # Path to robot image for animation
-robot_image_path = 'Nico/drone.png'
+robot_image_path = 'Mirco/drone.png'
 
 # Parameters
 d = 2  # dimension of the decision variable z
@@ -14,18 +18,13 @@ type = 'random'  # type of graph
 maxIters = 500  # maximum number of iterations
 alpha = 1e-2 # step-size
 target_std = 2  # standard deviation to generate target positions
-gamma = 0.0  # trade-off parameter for target attainment vs formation keeping
+gamma = 1.0  # trade-off parameter for target attainment vs formation keeping
 
 # Barrier function parameters
-mu = 0.2  # barrier parameter
+mu = 0.0  # barrier parameter
 threshold = 0.7  # threshold distance for barrier activation
 
 # Robot and target initializations 
-
-# radius = 6.0
-# angles = np.linspace(0, 2*np.pi, N, endpoint=False)
-# Possibility to initiate robot positions in circle
-# robot_positions = np.column_stack([radius * np.cos(angles) + 5, radius * np.sin(angles) + 5])
 robot_positions = np.random.uniform(low=0, high=10, size=(N, d))
 target_positions = robot_positions + np.random.normal(0, target_std,size=(N, d))
 
@@ -63,8 +62,6 @@ for i in range(N):
     s[0, i] = z[0, i]
     _,_, v[0, i] = CostFunction.distributed_aggregative_barrier(z[0, i], s[0, i], gamma, r0[i], target_positions[i], d,
                                                                           z[0, :, :], mu, threshold)
-    # _,_, v[0, i] = CostFunction.distributed_aggregative(z[0, i], s[0, i], gamma, r0[i], target_positions[i], d)
-    # _,_, v[0, i] = CostFunction.distributed_aggregative(z[0, i], s[0, i], gamma, r0, target_positions[i], d)
 
     grad_norm_1[0, i] = np.linalg.norm(v[0, i])  # norm of gradient_2
 
@@ -79,8 +76,7 @@ for k in range(maxIters - 1):
     for i in range(N):
         ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative_barrier(z[k, i], s[k, i], gamma, r0[i], target_positions[i], d, 
                                                                            z[k, :, :], mu, threshold)
-        # ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative(z[k, i], s[k, i], gamma, r0[i], target_positions[i], d)
-        # ell_i,grad_1,grad_2 = CostFunction.distributed_aggregative(z[k, i], s[k, i], gamma, r0, target_positions[i], d)
+
         # notice: grad_phi always equal to 1 so we dont add it in the code
  
         z[k + 1, i] = z[k, i] - alpha * (grad_1 + v[k, i])  # Update robot position
@@ -95,8 +91,6 @@ for k in range(maxIters - 1):
         s[k + 1, i] +=  z[k + 1, i] - z[k, i]   # Update local barycenter estimate
         _,_,grad_2_next = CostFunction.distributed_aggregative_barrier(z[k + 1, i], s[k + 1, i], gamma, r0[i], target_positions[i], d,
                                                                            z[k + 1, :, :], mu, threshold)
-        # _,_, grad_2_next = CostFunction.distributed_aggregative(z[k + 1, i], s[k + 1, i], gamma, r0[i], target_positions[i], d)
-        # _,_, grad_2_next = CostFunction.distributed_aggregative(z[k + 1, i], s[k + 1, i], gamma, r0, target_positions[i], d)
         v[k + 1, i] += grad_2_next - grad_2   # Update local gradient_2 estimate with innovation term
  
         grad_norm_1[k + 1, i] = np.linalg.norm(grad_1)  
@@ -126,14 +120,15 @@ print("\n\n")
 # Create plotter and generate all plots
 plotter = Plotter(N, d, N)
 
-# fig1 = plotter.plot_graph_and_weights(G, A)
-fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters)
-# fig3 = plotter.plot_gradient_norms(grad_norm_1, maxIters)
-# fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter, z_optimal)
+fig1 = plotter.plot_graph_and_weights(G, A, save=save_fig, save_path=fig_save_path+"graph.png")
+fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters, save=save_fig, save_path=fig_save_path+"cost_consensus.png")
+fig3 = plotter.plot_gradient_norms(grad_norm_1, maxIters, save=save_fig, save_path=fig_save_path+"gradient_norms.png")
+fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter, z_optimal, threshold=threshold, save=save_fig, save_path=fig_save_path+"trajectories.png")
 
 fig5 = plotter.plot_robot_animation(z, robot_positions, target_positions, 
-                                     maxIters, dt=0.01, save=False, 
-                                     gif_name='robot_formation_animation', threshold=threshold,
+                                     maxIters, dt=0.01, save=save_fig, 
+                                     save_path=fig_save_path+"robot_formation_animation.gif",
+                                     threshold=threshold,
                                      use_images=True, robot_image_path=robot_image_path,
                                      image_zoom=0.05)
 

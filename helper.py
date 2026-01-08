@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from PIL import Image, ImageEnhance
+import os
 
 class Digraph:
     """Class to manage graph creation and weight computation"""
@@ -177,8 +178,13 @@ class Plotter:
         self.N = N
         self.d = d
         self.NT = NT
+
+    def save_figure(self, fig, save_path, dpi=300):
+        """Save figure to specified path"""
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, bbox_inches='tight', dpi=dpi)
     
-    def plot_graph_and_weights(self, G, A):
+    def plot_graph_and_weights(self, G, A, save=False, save_path=None):
         """Plot network graph and weight matrix"""
         fig, axes = plt.subplots(figsize=(10, 5), nrows=1, ncols=2)
         
@@ -204,9 +210,13 @@ class Plotter:
                        ha="center", va="center", color="black", fontsize=8)
         
         plt.tight_layout()
+
+        if save and save_path:
+            self.save_figure(fig, save_path)
+
         return fig
     
-    def plot_cost_and_consensus(self, cost, z, maxIters):
+    def plot_cost_and_consensus(self, cost, z, maxIters, save=False, save_path=None):
         """Plot cost evolution and consensus error"""
 
         fig, axes = plt.subplots(figsize=(10, 5), nrows=1, ncols=2)
@@ -234,9 +244,13 @@ class Plotter:
         ax.legend()
         
         plt.tight_layout()
+
+        if save and save_path:
+            self.save_figure(fig, save_path)
+
         return fig
     
-    def plot_gradient_norms(self, grad_norm, maxIters):
+    def plot_gradient_norms(self, grad_norm, maxIters, save=False, save_path=None):
         """Plot individual and total gradient norms"""
 
         fig, axes = plt.subplots(figsize=(10, 5), nrows=1, ncols=2)
@@ -260,9 +274,13 @@ class Plotter:
         ax.grid(True)
         
         plt.tight_layout()
+
+        if save and save_path:
+            self.save_figure(fig, save_path)
+
         return fig
     
-    def plot_target_estimation(self, z, true_targets, maxIters):
+    def plot_target_estimation(self, z, true_targets, maxIters, save=False, save_path=None):
         """Plot target position estimation error and evolution"""
 
         fig, axes = plt.subplots(figsize=(10, 5), nrows=1, ncols=2)
@@ -331,10 +349,14 @@ class Plotter:
         ax.axis('equal')
         
         plt.tight_layout()
+
+        if save and save_path:
+            self.save_figure(fig, save_path)
+
         return fig
     
     def plot_robot_trajectories(self, z, robot_positions, final_positions, target_positions, 
-                                               final_barycenter, z_optimal=None):
+                                               final_barycenter, z_optimal=None, threshold= None, save=False, save_path=None):
         """Plot robot trajectories and barycenter estimation error"""
 
         # For aggregative problem, we can visualize robot trajectories
@@ -359,11 +381,18 @@ class Plotter:
             ax.scatter(target_positions[i, 0], target_positions[i, 1], s=150, marker='*', 
                     color=color, edgecolors='black', linewidths=1)
             
-            # Optimal position (triangle) - NEW
+            # Optimal position (triangle) 
             if z_optimal is not None:
                 ax.scatter(z_optimal[i, 0], z_optimal[i, 1], s=100, marker='^', 
                         color=color, edgecolors='gold', linewidths=2, zorder=0)
-
+    
+            # Collision avoidance circle at the final position
+            if threshold is not None:
+                circle = plt.Circle((final_positions[i, 0], final_positions[i, 1]), 
+                                    threshold, color=color, fill=False, 
+                                    linestyle='--', linewidth=1.5, alpha=0.5)
+                ax.add_patch(circle)
+                
         # # Desired barycenter (red pentagon)
         # ax.scatter(r0[0], r0[1], s=300, marker='P', color='red', 
         #           edgecolors='black', linewidths=2, label='Desired barycenter', zorder=10)
@@ -380,9 +409,13 @@ class Plotter:
         ax.axis('equal')
 
         plt.tight_layout()
+
+        if save and save_path:
+            self.save_figure(fig, save_path)
+
         return fig
     
-    def plot_robot_animation(self, z, robot_positions, target_positions, maxIters, dt=0.01, save=False, gif_name='robot_animation',
+    def plot_robot_animation(self, z, robot_positions, target_positions, maxIters, dt=0.01, save=False, save_path=None,
                               threshold=1.0, use_images=False, robot_image_path=None, image_zoom=0.05):
         """Create an animated plot showing robot trajectories and moving robots"""
 
@@ -481,7 +514,7 @@ class Plotter:
                     colored_image = self.color_image(base_image, rgb_color)
                     robot_img.append(colored_image)
                     
-                print(f"Created {len(robot_img)} colored drone images")
+                # print(f"Created {len(robot_img)} colored drone images")
             except Exception as e:
                 print(f"Warning: Could not load image '{robot_image_path}': {e}")
                 print("Falling back to dot markers")
@@ -597,8 +630,8 @@ class Plotter:
                           blit=True, interval=50)
         
         if save:
-            print(f'Saving animation as: {gif_name}.gif')
-            ani.save(f'{gif_name}.gif', writer='pillow', fps=20)
+            print(f'Saving animation as: {save_path}')
+            ani.save(f'{save_path}', writer='pillow', fps=20)
             print('Animation saved')
         
         fig.suptitle('Robot Trajectory Animation', fontsize=22)
