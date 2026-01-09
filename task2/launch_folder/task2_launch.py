@@ -15,7 +15,7 @@ def generate_launch_description():
     MAXITERS = 500 
     COMM_TIME = 1e-2
 
-    N = 6
+    N = 5
     d = 2
 
     alpha = 1e-2

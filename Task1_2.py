@@ -10,14 +10,14 @@ save_fig = True
 fig_save_path = "./figures/Task1_2/random_graph2/"
 
 # Parameters
-d = 2  # dimension of the decision variable z
-N = 8  # number of robots
-NT = 6  # number of targets
-p_er = 0.5  # probability for Erdos-Renyi graph
-type = 'random'  # Possible choices: 'cycle', 'random', 'star', 'path'
+d = 2           # dimension of the decision variable z
+N = 8           # number of robots
+NT = 6          # number of targets
+p_er = 0.5      # probability for Erdos-Renyi graph
+type = 'random' # possible choices: 'cycle', 'random', 'star', 'path'
 maxIters = 1000
-alpha = 1e-3 # step size
-noise_std = 0.1  # standard deviation of measurement noise
+alpha = 1e-3    # step size
+noise_std = 0.1 # standard deviation of measurement noise
 
 # Robot and target initializations 
 z_init = np.random.uniform(low=0, high=10, size=(N, NT*d))

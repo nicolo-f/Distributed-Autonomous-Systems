@@ -104,18 +104,10 @@ class CostFunction:
         bary_dist = z - bary  # corrected direction for formation keeping
         # cost += gamma * (np.linalg.norm(target_dist))**2 + (np.linalg.norm(bary_dist))**2
         cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2
-        
-        # # Gradient computation (Our calculations)
-        # grad_1 = 2*gamma*target_dist + (2.0/N)*bary_dist
-        # grad_2 = (2*bary_dist)
-        
-        # grad_1 = 2*gamma*target_dist + (1-gamma)*(2.0/N)*bary_dist
-        # grad_2 = (1-gamma)*(2*bary_dist) 
 
         # # Gradient computation (other solution)
         grad_1 = 2 * gamma * target_dist + 2 * (1-gamma) * bary_dist
         grad_2 = 2 * (1-gamma) * (-bary_dist)
-        # grad_2 = 2 * (1-gamma) * bary_dist
 
         return cost, grad_1, grad_2
     

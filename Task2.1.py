@@ -11,18 +11,18 @@ fig_save_path = "./figures/Task2_1/gamma1.0_mu0.0/"
 robot_image_path = 'Mirco/drone.png'
 
 # Parameters
-d = 2  # dimension of the decision variable z
-N = 8  # number of robots
-p_er = 0.5  # probability for Erdos-Renyi graph
-type = 'random'  # type of graph
+d = 2           # dimension of the decision variable z
+N = 8           # number of robots
+p_er = 0.5      # probability for Erdos-Renyi graph
+type = 'random' # type of graph
 maxIters = 500  # maximum number of iterations
-alpha = 1e-2 # step-size
+alpha = 1e-2    # step-size
 target_std = 2  # standard deviation to generate target positions
-gamma = 1.0  # trade-off parameter for target attainment vs formation keeping
+gamma = 1.0     # trade-off parameter for target attainment vs formation keeping
 
 # Barrier function parameters
-mu = 0.0  # barrier parameter
-threshold = 0.7  # threshold distance for barrier activation
+mu = 0.0        # barrier parameter
+threshold = 0.7 # threshold distance for barrier activation
 
 # Robot and target initializations 
 robot_positions = np.random.uniform(low=0, high=10, size=(N, d))

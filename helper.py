@@ -1,10 +1,9 @@
-from cv2 import threshold
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
-from PIL import Image, ImageEnhance
+from PIL import Image
 import os
 
 class Digraph:
@@ -110,18 +109,10 @@ class CostFunction:
         bary_dist = z - bary  # corrected direction for formation keeping
         # cost += gamma * (np.linalg.norm(target_dist))**2 + (np.linalg.norm(bary_dist))**2
         cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2
-        
-        # # Gradient computation (Our calculations)
-        # grad_1 = 2*gamma*target_dist + (2.0/N)*bary_dist
-        # grad_2 = (2*bary_dist)
-        
-        # grad_1 = 2*gamma*target_dist + (1-gamma)*(2.0/N)*bary_dist
-        # grad_2 = (1-gamma)*(2*bary_dist) 
-
-        # # Gradient computation (other solution)
+    
+        # Gradient computation (other solution)
         grad_1 = 2 * gamma * target_dist + 2 * (1-gamma) * bary_dist
         grad_2 = 2 * (1-gamma) * (-bary_dist)
-        # grad_2 = 2 * (1-gamma) * bary_dist
 
         return cost, grad_1, grad_2
     
@@ -129,8 +120,6 @@ class CostFunction:
         """ Compute cost and gradient for distributed aggregative formation control """
         cost = 0.0
         barrier_cost = 0.0
-
-        # delta = 10.0 # formation keeping weight (used for testing)
 
         grad_1 = np.zeros((d))
         grad_2 = np.zeros((d))
@@ -158,16 +147,12 @@ class CostFunction:
             barrier_grad += -2 * diff / barrier_arg
 
         cost += gamma * (np.linalg.norm(target_dist))**2 + (1-gamma)*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
-        # cost += gamma * (np.linalg.norm(target_dist))**2 + delta*(np.linalg.norm(bary_dist))**2 + mu * barrier_cost
         print(f"Barrier cost: {mu * barrier_cost}")
         
         # Gradient computation (other solution)
         grad_1 = 2 * gamma * target_dist + mu * barrier_grad + 2 * (1-gamma) * bary_dist
         grad_2 = 2 * (1-gamma) * (-bary_dist)
-        # grad_2 = 2 * delta * bary_dist
 
-        
-        
         return cost, grad_1, grad_2
 
 

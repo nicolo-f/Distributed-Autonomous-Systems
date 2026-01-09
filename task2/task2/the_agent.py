@@ -140,7 +140,6 @@ class Agent(Node):
         # Store old z for innovation term
         z_old = self.z.copy()
 
-        
         # ============================================================
         # Aggregative Tracking Distributed Optimization Algorithm
 
@@ -150,6 +149,8 @@ class Agent(Node):
 
         # Update position z[k+1] = z[k] - alpha*(grad_1 + v[k])
         self.z = self.z - self.alpha * (grad_1 + self.v)
+
+        self.r0 = self.z.copy()  # Update local contribution to barycenter
         
         # Weighted consensus for s and v from neighbors
         s_consensus = self.A_row[self.agent_id] * self.s

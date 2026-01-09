@@ -70,7 +70,7 @@ class Task2Plotter(Node):
         """Main control loop"""
         
         # Wait for data from all neighbors 
-        if self.k > 0 and len(self.neighbors) > 0:
+        if self.k > 0:
         # if True:
             if not all(self.data_received.values()):
                 return
@@ -98,7 +98,7 @@ class Task2Plotter(Node):
             recent_costs = total_cost[-20:]
             cost_variance = np.var(recent_costs)
             
-            if cost_variance < 1e-3 :
+            if cost_variance < 1e-4:
                 self.get_logger().info("Cost has stabilized!")
                 self.get_logger().info("Shutting down all nodes and stopping the monitor")
                 
@@ -117,7 +117,7 @@ class Task2Plotter(Node):
     # Setup matplotlib figure
     def initialize_plot(self):
         plt.ion()  # Interactive mode
-        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(10, 8))
+        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(8, 8))
         
         # Plot 1: Total cost
         self.ax1.set_xlabel('Iteration')

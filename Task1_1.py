@@ -10,13 +10,13 @@ save_fig = True
 fig_save_path = "./figures/Task1_1/path_graph/"
 
 # Parameters
-d = 3  # dimension of the decision variable z
-N = 8  # number of robots
-p_er = 0.5  # probability for Erdos-Renyi graph
-type = 'path'  # Possible choices: 'cycle', 'random', 'star', 'path'
+d = 3           # dimension of the decision variable z
+N = 8           # number of robots
+p_er = 0.5      # probability for Erdos-Renyi graph
+type = 'path'   # possible choices: 'cycle', 'random', 'star', 'path'
 maxIters = 1000
-alpha = 1e-2 # step size
-noise_std = 0.1  # standard deviation of measurement noise
+alpha = 1e-2    # step size
+noise_std = 0.1 # standard deviation of measurement noise
 
 # Robot initializations 
 z_init = np.random.normal(size=(N, d))
