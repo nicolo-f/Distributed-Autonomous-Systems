@@ -369,7 +369,8 @@ class Plotter:
             # Optimal position (triangle) 
             if z_optimal is not None:
                 ax.scatter(z_optimal[i, 0], z_optimal[i, 1], s=100, marker='^', 
-                        color=color, edgecolors='gold', linewidths=2, zorder=0)
+                        color=color, edgecolors='gold', linewidths=2, zorder=0,
+                        label='Optimal position' if i == self.N-1 else '_nolegend_')
     
             # Collision avoidance circle at the final position
             if threshold is not None:

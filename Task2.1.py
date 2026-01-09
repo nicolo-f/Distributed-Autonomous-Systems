@@ -120,16 +120,16 @@ print("\n\n")
 # Create plotter and generate all plots
 plotter = Plotter(N, d, N)
 
-fig1 = plotter.plot_graph_and_weights(G, A, save=save_fig, save_path=fig_save_path+"graph.png")
-fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters, save=save_fig, save_path=fig_save_path+"cost_consensus.png")
-fig3 = plotter.plot_gradient_norms(grad_norm_1, maxIters, save=save_fig, save_path=fig_save_path+"gradient_norms.png")
+# fig1 = plotter.plot_graph_and_weights(G, A, save=save_fig, save_path=fig_save_path+"graph.png")
+# fig2 = plotter.plot_cost_and_consensus(cost, z, maxIters, save=save_fig, save_path=fig_save_path+"cost_consensus.png")
+# fig3 = plotter.plot_gradient_norms(grad_norm_1, maxIters, save=save_fig, save_path=fig_save_path+"gradient_norms.png")
 fig4 = plotter.plot_robot_trajectories(z, robot_positions, final_positions, target_positions, final_barycenter, z_optimal, threshold=threshold, save=save_fig, save_path=fig_save_path+"trajectories.png")
 
-fig5 = plotter.plot_robot_animation(z, robot_positions, target_positions, 
-                                     maxIters, dt=0.01, save=save_fig, 
-                                     save_path=fig_save_path+"robot_formation_animation.gif",
-                                     threshold=threshold,
-                                     use_images=True, robot_image_path=robot_image_path,
-                                     image_zoom=0.05)
+# fig5 = plotter.plot_robot_animation(z, robot_positions, target_positions, 
+#                                      maxIters, dt=0.01, save=save_fig, 
+#                                      save_path=fig_save_path+"robot_formation_animation.gif",
+#                                      threshold=threshold,
+#                                      use_images=True, robot_image_path=robot_image_path,
+#                                      image_zoom=0.05)
 
 plt.show()
